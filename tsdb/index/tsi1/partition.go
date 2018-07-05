@@ -1120,27 +1120,18 @@ func (p *Partition) compactLogFile(logFile *LogFile) {
 		return
 	}
 
-	// Obtain lock to swap in index file and write manifest.
-	if err := func() error {
-		p.mu.Lock()
-		defer p.mu.Unlock()
+	// Replace previous log file with index file.
+	p.fileSet = p.fileSet.MustReplace([]File{logFile}, file)
 
-		// Replace previous log file with index file.
-		p.fileSet = p.fileSet.MustReplace([]File{logFile}, file)
-
-		// Write new manifest.
-		manifestSize, err := p.Manifest().Write()
-		if err != nil {
-			// TODO: Close index if write fails.
-			return err
-		}
-
-		p.manifestSize = manifestSize
-		return nil
-	}(); err != nil {
+	// Write new manifest.
+	manifestSize, err := p.Manifest().Write()
+	if err != nil {
+		// TODO: Close index if write fails.
 		log.Error("Cannot update manifest", zap.Error(err))
 		return
 	}
+
+	p.manifestSize = manifestSize
 
 	elapsed := time.Since(start)
 	log.Info("Log file compacted",
